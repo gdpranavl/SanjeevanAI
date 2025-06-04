@@ -2,7 +2,7 @@
 import { db } from '@vercel/postgres';
 import { NextResponse } from 'next/server';
 
-export async function GET(request) {
+export async function GET() {
   try {
     const client = await db.connect(); // Tries to connect using env vars
     const result = await client.sql`SELECT NOW();`; // Simple query
