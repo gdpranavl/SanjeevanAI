@@ -604,7 +604,7 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
         <DrawerHeader className="gap-1">
           <DrawerTitle>{item.name}</DrawerTitle>
           <DrawerDescription>
-            Showing total visitors for the last 6 months
+            Showing Diagnosis
           </DrawerDescription>
         </DrawerHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
@@ -653,13 +653,10 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
               <Separator />
               <div className="grid gap-2">
                 <div className="flex gap-2 leading-none font-medium">
-                  Trending up by 5.2% this month{" "}
-                  <IconTrendingUp className="size-4" />
+                  Asthma{" "}
                 </div>
                 <div className="text-muted-foreground">
-                  Showing total visitors for the last 6 months. This is just
-                  some random text to test the layout. It spans multiple lines
-                  and should wrap around.
+                Asthma is diagnosed based on your symptoms, medical history, physical examination, and lung function tests like spirometry. If your breathing improves after using a bronchodilator during testing, it supports the diagnosis of asthma. There is no single test for asthma; diagnosis is made by combining your symptoms, exam, and test results.
                 </div>
               </div>
               <Separator />
