@@ -30,7 +30,6 @@ import {
   IconGripVertical,
   IconLayoutColumns,
   IconPlus,
-  IconTrendingUp,
 } from "@tabler/icons-react"
 import {
   ColumnDef,
