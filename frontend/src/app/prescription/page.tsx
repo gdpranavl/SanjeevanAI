@@ -60,8 +60,9 @@ type CaseDetailsForPdf = {
     date: string;
     aiSummary: string;
     aiDiagnosis: string;
-    confidence: number;
+    // REMOVED confidence
     medicalHistory: string;
+    doctorName: string; // <<< --- ADD THIS LINE
 };
 
 // --- MOCK DATA ---
@@ -92,7 +93,7 @@ const pdfData = {
         date: caseDetails.date,
         aiSummary: caseDetails.aiSummary,
         aiDiagnosis: caseDetails.aiDiagnosis,
-        confidence: caseDetails.confidence,
+        doctorName: caseDetails.doctorName,
         medicalHistory: caseDetails.medicalHistory
     } as CaseDetailsForPdf
 };
