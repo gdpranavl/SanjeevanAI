@@ -41,13 +41,13 @@ const data = {
   },
   navMain: [
     {
-      title: "Dashboard",
-      url: "#",
+      title: "Pending Cases",
+      url: "dashboard/pending-cases",
       icon: IconDashboard,
     },
     {
-      title: "Cases",
-      url: "#",
+      title: "Approved Cases",
+      url: "dashboard/approved-cases",
       icon: IconListDetails,
     },
     {
