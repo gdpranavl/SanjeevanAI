@@ -106,6 +106,7 @@ export async function POST(request: Request) {
       message: "Doctor registered successfully.",
       DoctorId: totalRecords,
       DoctorName: doctorData.DoctorName,
+      Email : doctorData.Email,
       totalRecords, // Include the total number of records in the response
     });
   } catch (error) {

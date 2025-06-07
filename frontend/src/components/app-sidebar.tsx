@@ -35,8 +35,8 @@ import {
 
 const data = {
   user: {
-    name: "shadcn",
-    email: "m@example.com",
+    name: localStorage.getItem("DoctorName") || "Unknown Doctor", // Fix: Handle null values
+    email: localStorage.getItem("Email") || "Unknown Email", // Fix: Handle null values
     avatar: "/avatars/shadcn.jpg",
   },
   navMain: [

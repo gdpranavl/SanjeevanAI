@@ -54,7 +54,8 @@ export function SignUpForm({
         localStorage.setItem("loggedIn", "true")
         localStorage.setItem("DoctorName", result.DoctorName) // Fix: Use server response for DoctorName
         localStorage.setItem("DoctorID", result.DoctorID) // Fix: Add DoctorID to local storage
-        
+        localStorage.setItem("Email",result.Email)
+        window.location.href = "/dashboard"
       } else {
         const error = await response.json()
         alert(`Error: ${error.error || "Unknown error occurred."}`)

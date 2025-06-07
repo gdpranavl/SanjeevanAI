@@ -38,8 +38,12 @@ export function LoginForm({
 
       if (response.ok) {
         const result = await response.json()
+        console.log(result)
         localStorage.setItem("loggedIn", "true")
-        alert("Login successful!")
+        localStorage.setItem("DoctorName", result.DoctorName) // Fix: Use server response for DoctorName
+        localStorage.setItem("DoctorID", result.DoctorID) // Fix: Add DoctorID to local storage
+        localStorage.setItem("Email",result.Email)
+        window.location.href = "/dashboard"
       } else {
         const error = await response.json()
         setErrorMessage(error.message)
