@@ -104,7 +104,8 @@ export async function POST(request: Request) {
     // Return success response
     return NextResponse.json({
       message: "Doctor registered successfully.",
-      doctorId: result.insertedId,
+      DoctorId: totalRecords,
+      DoctorName: doctorData.DoctorName,
       totalRecords, // Include the total number of records in the response
     });
   } catch (error) {

@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
     }
-
+    
     // Connect to MongoDB
     await client.connect();
     const database = client.db("sanjeevanAI");
