@@ -8,7 +8,11 @@ import {
 } from "@/components/ui/sidebar"
 import { MongoClient } from 'mongodb';
 
-const uri = process.env.DATABASE_URL!;
+// Use environment variable for MongoDB URI for security and flexibility
+const uri = process.env.MONGODB_URI;
+if (!uri) {
+  throw new Error('MONGODB_URI environment variable is not set. Please define it in your .env file.');
+}
 
 async function connectToDatabase() {
     try {
