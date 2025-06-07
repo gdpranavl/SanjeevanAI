@@ -83,6 +83,7 @@ const prescriptionData: Medication[] = [
   { id: 1, name: "Albuterol", dosage: "90 mcg", frequency: "2 puffs as needed", duration: "30 Days", isExisting: false },
   { id: 2, name: "Fluticasone", dosage: "110 mcg", frequency: "1 puff twice daily", duration: "90 Days", isExisting: false },
   { id: 3, name: "Metformin", dosage: "500 mg", frequency: "1 tablet twice daily", duration: "Ongoing", isExisting: true },
+  { id: 4, name: "Melatonin", dosage: "500 mg", frequency: "1 tablet twice daily", duration: "300 Days", isExisting: false },
 ];
 
 const pdfData = {
