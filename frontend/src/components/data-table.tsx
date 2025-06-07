@@ -102,18 +102,25 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 
+// Updated schema to match MongoDB data structure
 export const schema = z.object({
-  id: z.number(),
-  name: z.string(),
-  diagnosis: z.string(),
-  severity: z.string(),
-  medicalhistory: z.string(),
-  medication: z.string(),
-  status: z.string(),
+  _id: z.string(),
+  PatientID: z.string(),
+  name: z.string().optional(),
+  diagnosis: z.string().optional(),
+  CriticalityNumber: z.number().optional(),
+  medicalHistory: z.string().optional(),
+  speciality: z.string().optional(),
+  ApprovalStatus: z.string(),
+  Summary: z.string().optional(),
+  age: z.number().optional(),
+  gender: z.string().optional(),
 })
 
+type CaseData = z.infer<typeof schema>
+
 // Create a separate component for the drag handle
-function DragHandle({ id }: { id: number }) {
+function DragHandle({ id }: { id: string }) {
   const { attributes, listeners } = useSortable({
     id,
   })
@@ -132,11 +139,11 @@ function DragHandle({ id }: { id: number }) {
   )
 }
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
+const columns: ColumnDef<CaseData>[] = [
   {
     id: "drag",
     header: () => null,
-    cell: ({ row }) => <DragHandle id={row.original.id} />,
+    cell: ({ row }) => <DragHandle id={row.original._id} />,
   },
   {
     id: "select",
@@ -168,7 +175,8 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     accessorKey: "name",
     header: "Name",
     cell: ({ row }) => {
-      return <TableCellViewer item={row.original} />
+      const name = row.original.name || `Patient ${row.original.PatientID}`
+      return <TableCellViewer item={row.original} name={name} />
     },
     enableHiding: false,
   },
@@ -178,56 +186,78 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     cell: ({ row }) => (
       <div className="w-32">
         <Badge variant="outline" className="text-muted-foreground px-1.5">
-          {row.original.diagnosis}
+          {row.original.diagnosis || "Not specified"}
         </Badge>
       </div>
     ),
   },
   {
-    accessorKey: "severity",
+    accessorKey: "CriticalityNumber",
     header: "Severity",
-    cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
-        {row.original.severity}
-      </Badge>
-    ),
+    cell: ({ row }) => {
+      const severity = row.original.CriticalityNumber || 0
+      const severityLevel = severity >= 8 ? "High" : severity >= 5 ? "Medium" : "Low"
+      const colorClass = severity >= 8 ? "bg-red-100 text-red-800" : 
+                        severity >= 5 ? "bg-yellow-100 text-yellow-800" : 
+                        "bg-green-100 text-green-800"
+      
+      return (
+        <Badge variant="outline" className={`px-1.5 ${colorClass}`}>
+          {severityLevel} ({severity})
+        </Badge>
+      )
+    },
   },
   {
-    accessorKey: "medicalhistory",
+    accessorKey: "medicalHistory",
     header: () => <div className="w-full text-left">Medical History</div>,
     cell: ({ row }) => (
       <div className="w-32">
         <Input
           className="text-muted-foreground"
-          defaultValue={row.original.medicalhistory}
+          defaultValue={row.original.medicalHistory || "No history"}
+          readOnly
         />
       </div>
     ),
   },
   {
-    accessorKey: "medication",
-    header: () => <div className="w-full text-left">Medication</div>,
+    accessorKey: "speciality",
+    header: () => <div className="w-full text-left">Speciality</div>,
     cell: ({ row }) => (
       <div className="w-32">
         <Input
           className="text-muted-foreground"
-          defaultValue={row.original.medication}
+          defaultValue={row.original.speciality || "General"}
+          readOnly
         />
       </div>
     ),
   },
   {
-    accessorKey: "status",
+    accessorKey: "ApprovalStatus",
     header: "Status",
-    cell: ({ row }) => (
-      <Button variant="outline" className="text-muted-foreground px-1.5">
-        {row.original.status}
-      </Button>
-    ),
+    cell: ({ row }) => {
+      const status = row.original.ApprovalStatus
+      const isApproved = status === "Approved"
+      
+      return (
+        <Button 
+          variant="outline" 
+          className={`px-1.5 ${
+            isApproved 
+              ? "text-green-700 border-green-300" 
+              : "text-red-700 border-red-300"
+          }`}
+        >
+          {status}
+        </Button>
+      )
+    },
   },
   {
     id: "actions",
-    cell: () => (
+    cell: ({ row }) => (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -240,20 +270,20 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-32">
+          <DropdownMenuItem>Approve</DropdownMenuItem>
           <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuItem>Make a copy</DropdownMenuItem>
-          <DropdownMenuItem>Favorite</DropdownMenuItem>
+          <DropdownMenuItem>View Details</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+          <DropdownMenuItem className="text-red-600">Reject</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     ),
   },
 ]
 
-function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
+function DraggableRow({ row }: { row: Row<CaseData> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
-    id: row.original.id,
+    id: row.original._id,
   })
 
   return (
@@ -279,9 +309,9 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
 export function DataTable({
   data: initialData,
 }: {
-  data: z.infer<typeof schema>[]
+  data: CaseData[]
 }) {
-  const [data, setData] = React.useState(() => initialData)
+  const [data, setData] = React.useState(() => initialData || [])
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
@@ -300,8 +330,13 @@ export function DataTable({
     useSensor(KeyboardSensor, {})
   )
 
+  // Update data when initialData changes
+  React.useEffect(() => {
+    setData(initialData || [])
+  }, [initialData])
+
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ id }) => id) || [],
+    () => data?.map(({ _id }) => _id) || [],
     [data]
   )
 
@@ -315,7 +350,7 @@ export function DataTable({
       columnFilters,
       pagination,
     },
-    getRowId: (row) => row.id.toString(),
+    getRowId: (row) => row._id?.toString() || Math.random().toString(),
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
@@ -464,7 +499,7 @@ export function DataTable({
                       colSpan={columns.length}
                       className="h-24 text-center"
                     >
-                      No results.
+                      No unapproved cases found.
                     </TableCell>
                   </TableRow>
                 )}
@@ -589,21 +624,21 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
+function TableCellViewer({ item, name }: { item: CaseData; name: string }) {
   const isMobile = useIsMobile()
 
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
       <DrawerTrigger asChild>
         <Button variant="link" className="text-foreground w-fit px-0 text-left">
-          {item.name}
+          {name}
         </Button>
       </DrawerTrigger>
       <DrawerContent>
         <DrawerHeader className="gap-1">
-          <DrawerTitle>{item.name}</DrawerTitle>
+          <DrawerTitle>{name}</DrawerTitle>
           <DrawerDescription>
-            Showing Diagnosis
+            Case Details and Medical Information
           </DrawerDescription>
         </DrawerHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
@@ -652,10 +687,10 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
               <Separator />
               <div className="grid gap-2">
                 <div className="flex gap-2 leading-none font-medium">
-                  Asthma{" "}
+                  {item.diagnosis || "Diagnosis pending"}
                 </div>
                 <div className="text-muted-foreground">
-                Asthma is diagnosed based on your symptoms, medical history, physical examination, and lung function tests like spirometry. If your breathing improves after using a bronchodilator during testing, it supports the diagnosis of asthma. There is no single test for asthma; diagnosis is made by combining your symptoms, exam, and test results.
+                  {item.Summary || "Medical summary not available for this case."}
                 </div>
               </div>
               <Separator />
@@ -663,19 +698,21 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
           )}
           <form className="flex flex-col gap-4">
             <div className="flex flex-col gap-3">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">Patient Name</Label>
               <Badge variant="outline" className="font-bold text-lg text-muted-foreground px-2">
-                {item.name}
+                {name}
               </Badge>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-3">
                 <Label htmlFor="diagnosis">Diagnosis</Label>
-                <Input id="diagnosis" defaultValue={item.diagnosis} />
+                <Input id="diagnosis" defaultValue={item.diagnosis || "Not specified"} />
               </div>
               <div className="flex flex-col gap-3">
                 <Label htmlFor="severity">Severity</Label>
-                <Select defaultValue={item.severity}>
+                <Select defaultValue={item.CriticalityNumber ? 
+                  (item.CriticalityNumber >= 8 ? "Severe" : 
+                   item.CriticalityNumber >= 5 ? "Moderate" : "Mild") : "Mild"}>
                   <SelectTrigger id="severity" className="w-full">
                     <SelectValue placeholder="Select severity" />
                   </SelectTrigger>
@@ -690,19 +727,19 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-3">
                 <Label htmlFor="medicalhistory">Medical History</Label>
-                <Input id="medicalhistory" defaultValue={item.medicalhistory} />
+                <Input id="medicalhistory" defaultValue={item.medicalHistory || "No history available"} />
               </div>
               <div className="flex flex-col gap-3">
-                <Label htmlFor="medication">Medication</Label>
-                <Input id="medication" defaultValue={item.medication} />
+                <Label htmlFor="speciality">Speciality</Label>
+                <Input id="speciality" defaultValue={item.speciality || "General"} />
               </div>
             </div>
           </form>
         </div>
         <DrawerFooter>
-          <Button>Submit</Button>
+          <Button>Approve Case</Button>
           <DrawerClose asChild>
-            <Button variant="outline">Done</Button>
+            <Button variant="outline">Close</Button>
           </DrawerClose>
         </DrawerFooter>
       </DrawerContent>

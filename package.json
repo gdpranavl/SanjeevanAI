@@ -1,5 +1,28 @@
 {
   "dependencies": {
-    "@vercel/postgres": "^0.10.0"
-  }
+    "@vercel/postgres": "^0.10.0",
+    "next": "^15.3.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "name": "sanjeevanai",
+  "version": "1.0.0",
+  "description": "��#\u0000 \u0000S\u0000a\u0000n\u0000j\u0000e\u0000e\u0000v\u0000a\u0000n\u0000A\u0000I\u0000\r\u0000 \u0000",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RaghottamNadgoudar/SanjeevanAI.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/RaghottamNadgoudar/SanjeevanAI/issues"
+  },
+  "homepage": "https://github.com/RaghottamNadgoudar/SanjeevanAI#readme"
 }
