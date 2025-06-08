@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     console.log("Total records in doctors collection:", totalRecords); // Log the total records count
 
     const doctorData = {
-      DoctorID: `D${totalRecords}`, // Generate a unique DoctorID
+      DoctorID: `D${totalRecords.toString().padStart(3, "0")}`, // Generate a unique DoctorID with leading zeros
       DoctorName,
       DoctorSign: password, // Use password as DoctorSign for now
       DoctorQualification: {
@@ -90,12 +90,7 @@ export async function POST(request: Request) {
 
     console.log("Prepared doctorData:", doctorData); // Log the prepared doctor data
 
-    // Check if the doctor already exists
-    const existingDoctor = await doctors.findOne({ DoctorID: doctorData.DoctorID });
-    if (existingDoctor) {
-      console.error("Doctor already exists:", existingDoctor);
-      return NextResponse.json({ error: "Doctor already exists." }, { status: 409 });
-    }
+    // Check if the doctor already exist
 
     // Insert the doctor data into the database using the template
     const result = await doctors.insertOne(doctorData);
@@ -104,7 +99,7 @@ export async function POST(request: Request) {
     // Return success response
     return NextResponse.json({
       message: "Doctor registered successfully.",
-      DoctorId: totalRecords,
+      DoctorId: totalRecords + 1, // Use totalRecords + 1 for the DoctorId
       DoctorName: doctorData.DoctorName,
       Email : doctorData.Email,
       totalRecords, // Include the total number of records in the response
