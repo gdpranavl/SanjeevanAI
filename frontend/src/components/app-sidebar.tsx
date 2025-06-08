@@ -42,12 +42,17 @@ const data = {
   navMain: [
     {
       title: "Pending Cases",
-      url: "dashboard/pending-cases",
+      url: "/dashboard/pending-cases",
       icon: IconDashboard,
     },
     {
       title: "Approved Cases",
-      url: "dashboard/approved-cases",
+      url: "/dashboard/approved-cases",
+      icon: IconListDetails,
+    },
+    {
+      title: "Rejected Cases",
+      url: "/dashboard/rejected-cases",
       icon: IconListDetails,
     },
     {
