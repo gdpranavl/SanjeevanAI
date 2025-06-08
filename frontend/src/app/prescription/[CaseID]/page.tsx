@@ -30,25 +30,11 @@ import {
   XCircle,
 } from "lucide-react";
 import { AppLayout } from "@/components/app-layout";
-import { MongoClient } from 'mongodb';
+import { MongoClient } from 'mongodb'; // <--- FIX: Re-added this import
+import { updateApprovalStatus } from "@/app/actions";
 
 const uri = process.env.MONGODB_URI;
 
-async function connectToDatabase() {
-    try {
-        if (!uri) {
-            throw new Error('MONGODB_URI environment variable is not set.');
-        }
-        const client = new MongoClient(uri);
-        await client.connect();
-        return { client, db: client.db('maindb') };
-    } catch (error) {
-        console.error('Error connecting to database:', error);
-        throw error;
-    }
-}
-
-// --- *** FIX 1: Explicitly typed the data returned from the aggregation pipeline *** ---
 type ProcessedMedication = {
   Dosage: { M: boolean; A: boolean; E: boolean; N: boolean; };
   Timing: { DailyTimes: string; Duration: string; FoodRelation: string; };
@@ -59,7 +45,6 @@ type ProcessedMedication = {
   } | null;
 };
 
-// --- *** FIX 2: Updated CaseData type for stricter transcript and medication typing *** ---
 type CaseData = {
     caseId: string;
     prescriptionId: string;
@@ -67,7 +52,7 @@ type CaseData = {
     aiSummary: string;
     aiDiagnosis: string;
     aiJustification: string;
-    transcript: string | string[]; // Can be a string or an array from the DB
+    transcript: string | string[];
     patientName: string;
     patientAge: number;
     patientGender: "Male" | "Female" | "Other";
@@ -76,9 +61,23 @@ type CaseData = {
     patientAllergies: string[];
     medicalHistory: string;
     processedMedications: ProcessedMedication[];
+    ApprovalStatus: "Pending" | "Approved" | "Rejected";
 };
 
-// --- *** FIX 3: Added an explicit return type to the function signature *** ---
+async function connectToDatabase() {
+    try {
+        if (!uri) {
+            throw new Error('MONGODB_URI environment variable is not set.');
+        }
+        const client = new MongoClient(uri); // This line needs MongoClient to be defined
+        await client.connect();
+        return { client, db: client.db('maindb') };
+    } catch (error) {
+        console.error('Error connecting to database:', error);
+        throw error;
+    }
+}
+
 async function getPrescriptionByCaseId(CaseID: string): Promise<CaseData | null> {
     let client;
     try {
@@ -150,13 +149,13 @@ async function getPrescriptionByCaseId(CaseID: string): Promise<CaseData | null>
                     patientWeight: '$patientDetails.Weight',
                     patientAllergies: '$patientDetails.Allergies',
                     medicalHistory: '$patientDetails.MedicalHistory.Summary',
-                    processedMedications: '$processedMedications'
+                    processedMedications: '$processedMedications',
+                    ApprovalStatus: '$caseDetails.ApprovalStatus',
                 }
             }
-        ]).toArray() as any[]; // Cast to avoid deep BSON type issues with TS
+        ]).toArray() as any[];
       
         const data = results.length > 0 ? results[0] : null;
-        // The data is serialized to remove any DB-specific types before sending to the client component.
         return JSON.parse(JSON.stringify(data));
       
     } catch (error) {
@@ -232,7 +231,6 @@ export default async function PrescriptionPage({ params }: PrescriptionPageProps
         );
     }
     
-    // This mapping now uses the stricter `ProcessedMedication` type
     const allMedications: Medication[] = 
         (caseData.processedMedications || []).map((med: ProcessedMedication, index) => ({
             id: `rec-${med.MedicationDetails?.MedicationID || index}`,
@@ -243,7 +241,6 @@ export default async function PrescriptionPage({ params }: PrescriptionPageProps
             isExisting: false
         }));
 
-    // --- *** FIX 4: Safely format transcript regardless of whether it's a string or array *** ---
     const transcriptText = Array.isArray(caseData.transcript) 
         ? caseData.transcript.join('\n\n') 
         : caseData.transcript || "No transcript available.";
@@ -340,7 +337,7 @@ export default async function PrescriptionPage({ params }: PrescriptionPageProps
                       <CardContent>
                           <Textarea
                               readOnly
-                              value={transcriptText} // Use the safely formatted text
+                              value={transcriptText}
                               className="h-24 text-xs bg-muted border-none"
                           />
                       </CardContent>
@@ -356,7 +353,7 @@ export default async function PrescriptionPage({ params }: PrescriptionPageProps
                           <Pill className="h-6 w-6"/>
                           Recommended Prescription
                       </CardTitle>
-                      <CardDescription>Status: Pending Doctor Approval</CardDescription>
+                      <CardDescription>Status: {caseData.ApprovalStatus || "N/A"}</CardDescription> 
                   </div>
                   <Button>
                       <PlusCircle className="mr-2 h-4 w-4" /> Add Medication
@@ -400,10 +397,27 @@ export default async function PrescriptionPage({ params }: PrescriptionPageProps
             </Card>
 
             <div className="flex justify-end space-x-4 pt-4">
-              <Button variant="outline">
-                  <AlertCircle className="mr-2 h-4 w-4" /> Request AI Revision
-              </Button>
-              <Button size="lg">Approve & Finalize Prescription</Button>
+              <form action={async () => {
+                'use server';
+                const result = await updateApprovalStatus(params.CaseID, "Rejected");
+                if (!result.success) {
+                    console.error("Failed to reject prescription:", result.message);
+                }
+              }}>
+                <Button type="submit" variant="outline">
+                    <AlertCircle className="mr-2 h-4 w-4" /> Request AI Revision
+                </Button>
+              </form>
+
+              <form action={async () => {
+                'use server';
+                const result = await updateApprovalStatus(params.CaseID, "Approved");
+                if (!result.success) {
+                    console.error("Failed to approve prescription:", result.message);
+                }
+              }}>
+                <Button type="submit" size="lg">Approve & Finalize Prescription</Button>
+              </form>
             </div>
           </div>
         </AppLayout>
