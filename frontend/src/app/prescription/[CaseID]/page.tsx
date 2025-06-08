@@ -6,7 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"; // Keep this for 'Add Medication' button
 import {
   Table,
   TableBody,
@@ -26,12 +26,18 @@ import {
   PlusCircle,
   Pencil,
   Trash2,
-  AlertCircle,
   XCircle,
+  // AlertCircle is no longer needed here as it's used in the client component
 } from "lucide-react";
 import { AppLayout } from "@/components/app-layout";
-import { MongoClient } from 'mongodb'; // <--- FIX: Re-added this import
-import { updateApprovalStatus } from "@/app/actions";
+import { MongoClient } from 'mongodb';
+
+// Remove updateApprovalStatus import as it's now used in prescription-actions.tsx
+// import { updateApprovalStatus } from "@/app/actions"; 
+
+// NEW: Import the client component
+import { PrescriptionActions } from "@/components/prescription-actions";
+
 
 const uri = process.env.MONGODB_URI;
 
@@ -69,7 +75,7 @@ async function connectToDatabase() {
         if (!uri) {
             throw new Error('MONGODB_URI environment variable is not set.');
         }
-        const client = new MongoClient(uri); // This line needs MongoClient to be defined
+        const client = new MongoClient(uri);
         await client.connect();
         return { client, db: client.db('maindb') };
     } catch (error) {
@@ -396,29 +402,13 @@ export default async function PrescriptionPage({ params }: PrescriptionPageProps
               </CardContent>
             </Card>
 
-            <div className="flex justify-end space-x-4 pt-4">
-              <form action={async () => {
-                'use server';
-                const result = await updateApprovalStatus(params.CaseID, "Rejected");
-                if (!result.success) {
-                    console.error("Failed to reject prescription:", result.message);
-                }
-              }}>
-                <Button type="submit" variant="outline">
-                    <AlertCircle className="mr-2 h-4 w-4" /> Request AI Revision
-                </Button>
-              </form>
+            {/* NEW: Render the Client Component for actions */}
+            <PrescriptionActions
+                caseId={params.CaseID}
+                patientName={caseData.patientName}
+                currentStatus={caseData.ApprovalStatus}
+            />
 
-              <form action={async () => {
-                'use server';
-                const result = await updateApprovalStatus(params.CaseID, "Approved");
-                if (!result.success) {
-                    console.error("Failed to approve prescription:", result.message);
-                }
-              }}>
-                <Button type="submit" size="lg">Approve & Finalize Prescription</Button>
-              </form>
-            </div>
           </div>
         </AppLayout>
       );

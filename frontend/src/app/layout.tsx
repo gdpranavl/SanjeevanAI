@@ -1,7 +1,10 @@
+// app/layout.tsx
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+// Make sure this imports the Toaster component provided by sonner (or its Shadcn/ui wrapper)
+import { Toaster } from "@/components/ui/sonner"; // <--- Updated import for sonner
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +39,8 @@ export default function RootLayout({
         >
           {children}
         </ThemeProvider>
+        {/* Use the Toaster component from sonner. Common props like position are useful. */}
+        <Toaster richColors position="top-right" /> {/* <--- Use sonner's Toaster and add desired props */}
       </body>
     </html>
   );
