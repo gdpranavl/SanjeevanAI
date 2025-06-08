@@ -1,4 +1,4 @@
-// app/prescription/[CaseID]/page.tsx
+// main:// app/prescription/[CaseID]/page.tsx
 import {
   Card,
   CardContent,
@@ -20,6 +20,7 @@ import {
   Mic,
   Camera,
   XCircle,
+  // NEW: Download icon for PDF, imported in PdfDownloadButton already
 } from "lucide-react";
 import { AppLayout } from "@/components/app-layout";
 import { MongoClient } from 'mongodb';
@@ -29,6 +30,8 @@ import { PrescriptionActions } from "@/components/prescription-actions";
 // Import NEW server action and NEW client component
 import { getAllMedicationsForDropdown } from "@/app/actions"; 
 import { PrescriptionMedicationTable } from "@/components/prescription-medication-table";
+// NEW: Import the PdfDownloadButton client component
+import { PdfDownloadButton } from "@/components/pdf-download-button";
 
 
 const uri = process.env.MONGODB_URI;
@@ -297,6 +300,45 @@ export default async function PrescriptionPage({ params }: PrescriptionPageProps
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">Consultation Date</p>
                 <p className="font-medium">{new Date(caseData.date).toLocaleString()}</p>
+                {/* NEW: PDF Download Button */}
+                {/* Conditionally render if caseData exists, ensuring data is ready */}
+                {caseData && (
+                  <div className="mt-4"> {/* Added a div for spacing */}
+                      <PdfDownloadButton
+                        patient={{
+                            name: caseData.patientName,
+                            age: caseData.patientAge,
+                            gender: caseData.patientGender,
+                            height: caseData.patientHeight,
+                            weight: caseData.patientWeight,
+                            allergies: caseData.patientAllergies || [],
+                        }}
+                        caseDetails={{
+                            prescriptionId: caseData.prescriptionId,
+                            // Format date for the report as requested by the template (string)
+                            date: new Date(caseData.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+                            // IMPORTANT: doctorName is not available in CaseData. 
+                            // Using a placeholder. In a real app, this would be fetched from DB or user session.
+                            doctorName: "Dr. AI Assistant", 
+                            aiSummary: caseData.aiSummary,
+                            aiDiagnosis: caseData.aiDiagnosis,
+                            medicalHistory: caseData.medicalHistory,
+                        }}
+                        medications={initialMedicationsForTable.map((med, index) => ({
+                          // Use index for 'id' as the template expects a number, 
+                          // and client-side 'id' is a complex string not convertible to number.
+                          id: index, 
+                          name: med.name,
+                          dosage: med.dosage,
+                          frequency: med.frequency,
+                          duration: med.duration,
+                          isExisting: med.isExisting,
+                        }))}
+                        // Construct a descriptive filename for the PDF
+                        fileName={`prescription-${caseData.patientName.replace(/\s+/g, '-')}-${caseData.caseId}.pdf`}
+                      />
+                  </div>
+                )}
               </div>
             </div>
 
