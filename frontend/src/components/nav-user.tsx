@@ -98,7 +98,10 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => {
+              localStorage.clear(); 
+              window.location.href = "/signIn"; // Redirect to the sign-in page
+            }}>
               <IconLogout />
               Log out
             </DropdownMenuItem>
