@@ -54,6 +54,10 @@ export function LoginForm({
     }
   }
 
+  if (errorMessage) {
+    alert(`Error: ${errorMessage}`) // Show alert for error message
+  }
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
