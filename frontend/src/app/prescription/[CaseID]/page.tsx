@@ -1,3 +1,4 @@
+// app/prescription/[CaseID]/page.tsx
 import {
   Card,
   CardContent,
@@ -6,42 +7,34 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button"; // Keep this for 'Add Medication' button
+import { Button } from "@/components/ui/button"; // Keep this for other static buttons
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  // Table, TableBody, TableCell, TableHead, TableHeader, TableRow, // These are now managed inside PrescriptionMedicationTable
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import {
   FileText,
   Stethoscope,
   BrainCircuit,
-  Pill,
+  // Pill, PlusCircle, Pencil, Trash2, // These icons are now used within PrescriptionMedicationTable
   Mic,
   Camera,
-  PlusCircle,
-  Pencil,
-  Trash2,
   XCircle,
-  // AlertCircle is no longer needed here as it's used in the client component
 } from "lucide-react";
 import { AppLayout } from "@/components/app-layout";
 import { MongoClient } from 'mongodb';
 
-// Remove updateApprovalStatus import as it's now used in prescription-actions.tsx
-// import { updateApprovalStatus } from "@/app/actions"; 
-
-// NEW: Import the client component
+// Import existing client component for actions
 import { PrescriptionActions } from "@/components/prescription-actions";
+// Import NEW server action and NEW client component
+import { getAllMedicationsForDropdown } from "@/app/actions"; 
+import { PrescriptionMedicationTable } from "@/components/prescription-medication-table";
 
 
 const uri = process.env.MONGODB_URI;
 
-type ProcessedMedication = {
+// Type definition for medications as they come out of the aggregation pipeline
+type ProcessedMedicationFromDB = {
   Dosage: { M: boolean; A: boolean; E: boolean; N: boolean; };
   Timing: { DailyTimes: string; Duration: string; FoodRelation: string; };
   AdditionalNotes: string;
@@ -49,6 +42,21 @@ type ProcessedMedication = {
     MedicationID: string;
     MedicationName: string;
   } | null;
+};
+
+// Type definition for medications as prepared for the client-side table component
+type MedicationForTable = {
+  id: string; // Client-side unique ID for new rows
+  name: string; // Medication Name (from MedicationDetails)
+  medicationId: string | null; // MedicationID from DB (for lookup/saving)
+  dosage: string; // Formatted dosage string for display
+  rawDosage: { M: boolean; A: boolean; E: boolean; N: boolean }; // Raw object for saving
+  frequency: string; // Timing.DailyTimes
+  duration:string;
+  foodRelation: string; // Timing.FoodRelation
+  additionalNotes: string; // AdditionalNotes
+  isExisting: boolean; // True if it came from DB, false if newly added
+  isEditing: boolean; // For managing inline edit state
 };
 
 type CaseData = {
@@ -66,7 +74,7 @@ type CaseData = {
     patientWeight: string;
     patientAllergies: string[];
     medicalHistory: string;
-    processedMedications: ProcessedMedication[];
+    processedMedications: ProcessedMedicationFromDB[]; 
     ApprovalStatus: "Pending" | "Approved" | "Rejected";
 };
 
@@ -84,6 +92,18 @@ async function connectToDatabase() {
     }
 }
 
+// Helper function to format dosage for display purposes, used both on server and in client component
+function formatDosage(dosage: { M: boolean; A: boolean; E: boolean; N: boolean }): string {
+    if (!dosage) return "Not specified";
+    const parts = [];
+    if (dosage.M) parts.push("Morning");
+    if (dosage.A) parts.push("Afternoon");
+    if (dosage.E) parts.push("Evening");
+    if (dosage.N) parts.push("Night");
+    return parts.length > 0 ? parts.join(', ') : "Not specified";
+}
+
+
 async function getPrescriptionByCaseId(CaseID: string): Promise<CaseData | null> {
     let client;
     try {
@@ -92,16 +112,19 @@ async function getPrescriptionByCaseId(CaseID: string): Promise<CaseData | null>
 
         const results: CaseData[] = await db.collection('prescriptions').aggregate([
             { $match: { CaseID: CaseID } },
-            { $unwind: '$MedicationItems' },
+            // If there are no MedicationItems, $unwind will remove the document.
+            // Ensure this is intended behavior or add { preserveNullAndEmptyArrays: true }
+            // Given the input schema and behavior, it likely means we want to process only items.
+            { $unwind: { path: '$MedicationItems', preserveNullAndEmptyArrays: true } }, 
             {
                 $lookup: {
                     from: 'medications',
-                    localField: 'MedicationItems.MedicationPlan.Main',
+                    localField: 'MedicationItems.MedicationPlan.Main', // Look up using MedicationID from MedicationItems
                     foreignField: 'MedicationID',
                     as: 'mainMedicationDetails'
                 }
             },
-            { $unwind: { path: '$mainMedicationDetails', preserveNullAndEmptyArrays: true } },
+            { $unwind: { path: '$mainMedicationDetails', preserveNullAndEmptyArrays: true } }, // Ensure lookup details don't drop the item if no match
             {
                 $group: {
                     _id: '$_id',
@@ -109,16 +132,25 @@ async function getPrescriptionByCaseId(CaseID: string): Promise<CaseData | null>
                     PatientID: { $first: '$PatientID' },
                     PrescriptionID: { $first: '$PrescriptionID' },
                     MajorNotes: { $first: '$MajorNotes' },
-                    processedMedications: {
+                    processedMedications: { // Collect all processed medication items into an array
                         $push: {
-                            Dosage: '$MedicationItems.Dosage',
-                            Timing: '$MedicationItems.Timing',
-                            AdditionalNotes: '$MedicationItems.AdditionalNotes',
-                            MedicationDetails: '$mainMedicationDetails'
+                            // Check if MedicationItems exists for current processing (if preserveNullAndEmptyArrays was true above)
+                            // This ensures an item for 'null' MedicationItems isn't created.
+                            $cond: [
+                                '$MedicationItems', // If MedicationItems exists
+                                {
+                                    Dosage: '$MedicationItems.Dosage',
+                                    Timing: '$MedicationItems.Timing',
+                                    AdditionalNotes: '$MedicationItems.AdditionalNotes',
+                                    MedicationDetails: '$mainMedicationDetails'
+                                },
+                                '$$REMOVE' // If MedicationItems doesn't exist, remove this pushed element
+                            ]
                         }
                     }
                 }
             },
+            // The rest of your lookups remain the same
             {
                 $lookup: {
                     from: 'cases',
@@ -161,6 +193,12 @@ async function getPrescriptionByCaseId(CaseID: string): Promise<CaseData | null>
             }
         ]).toArray() as any[];
       
+        // Filter out any potential null/undefined processedMedications if the original array was empty
+        // The $cond in group stage should prevent this for original unwind + group, but defensive
+        if (results.length > 0 && results[0].processedMedications) {
+            results[0].processedMedications = results[0].processedMedications.filter(med => med);
+        }
+
         const data = results.length > 0 ? results[0] : null;
         return JSON.parse(JSON.stringify(data));
       
@@ -175,39 +213,24 @@ async function getPrescriptionByCaseId(CaseID: string): Promise<CaseData | null>
 }
 
 
-type Medication = {
-  id: string;
-  name: string;
-  dosage: string;
-  frequency: string;
-  duration:string;
-  isExisting: boolean;
-};
-
 type PrescriptionPageProps = {
   params: {
     CaseID: string;
   };
 };
 
-function formatDosage(dosage: { M: boolean; A: boolean; E: boolean; N: boolean }): string {
-    if (!dosage) return "Not specified";
-    const parts = [];
-    if (dosage.M) parts.push("Morning");
-    if (dosage.A) parts.push("Afternoon");
-    if (dosage.E) parts.push("Evening");
-    if (dosage.N) parts.push("Night");
-    return parts.length > 0 ? parts.join(', ') : "Not specified";
-}
 
 export default async function PrescriptionPage({ params }: PrescriptionPageProps) {
     let caseData: CaseData | null = null;
     let error: string | null = null;
+    // Define type for allMedicationsFromDB as fetched by the action
+    let allMedicationsFromDB: { MedicationID: string; MedicationName: string; }[] = [];
     
     try {
-      
         if (!uri) throw new Error('Database connection string is not configured.');
         caseData = await getPrescriptionByCaseId(params.CaseID);
+        // Fetch the full list of medications to pass to the client component for its dropdowns
+        allMedicationsFromDB = await getAllMedicationsForDropdown(); 
     } catch (err) {
         console.error("Page error:", err);
         error = err instanceof Error ? err.message : "An unknown error occurred.";
@@ -237,15 +260,23 @@ export default async function PrescriptionPage({ params }: PrescriptionPageProps
         );
     }
     
-    const allMedications: Medication[] = 
-        (caseData.processedMedications || []).map((med: ProcessedMedication, index) => ({
-            id: `rec-${med.MedicationDetails?.MedicationID || index}`,
+    // Map initial medications from fetched CaseData (ProcessedMedicationFromDB)
+    // to the format expected by the client-side PrescriptionMedicationTable component (MedicationForTable).
+    const initialMedicationsForTable: MedicationForTable[] = 
+        (caseData.processedMedications || []).map((med: ProcessedMedicationFromDB, index) => ({
+            id: `existing-${med.MedicationDetails?.MedicationID || index}-${Date.now()}`, // Unique ID for keying
             name: med.MedicationDetails?.MedicationName || "Unknown Medication",
-            dosage: formatDosage(med.Dosage),
+            medicationId: med.MedicationDetails?.MedicationID || null, // Ensure ID is part of the mapped data
+            dosage: formatDosage(med.Dosage), 
+            rawDosage: med.Dosage, // Keep raw dosage for editing
             frequency: med.Timing?.DailyTimes || "Not specified",
             duration: med.Timing?.Duration || "Not specified",
-            isExisting: false
+            foodRelation: med.Timing?.FoodRelation || "", // Include foodRelation from DB
+            additionalNotes: med.AdditionalNotes || "", // Include additional notes from DB
+            isExisting: true, // Mark as existing
+            isEditing: false // Existing rows start not in editing mode
         }));
+
 
     const transcriptText = Array.isArray(caseData.transcript) 
         ? caseData.transcript.join('\n\n') 
@@ -351,58 +382,15 @@ export default async function PrescriptionPage({ params }: PrescriptionPageProps
               </div>
             </div>
 
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                      <CardTitle className="flex items-center gap-2">
-                          <Pill className="h-6 w-6"/>
-                          Recommended Prescription
-                      </CardTitle>
-                      <CardDescription>Status: {caseData.ApprovalStatus || "N/A"}</CardDescription> 
-                  </div>
-                  <Button>
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Medication
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[250px]">Medication</TableHead>
-                      <TableHead>Dosage</TableHead>
-                      <TableHead>Frequency</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {allMedications.map((med) => (
-                      <TableRow key={med.id}>
-                        <TableCell className="font-medium">
-                          {med.name}
-                          {med.isExisting && <Badge variant="secondary" className="ml-2">Existing</Badge>}
-                        </TableCell>
-                        <TableCell>{med.dosage}</TableCell>
-                        <TableCell>{med.frequency}</TableCell>
-                        <TableCell>{med.duration}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon">
-                              <Pencil className="h-4 w-4"/>
-                          </Button>
-                           <Button variant="ghost" size="icon" className="text-destructive">
-                              <Trash2 className="h-4 w-4"/>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            {/* Render the new Medication Table Client Component */}
+            <PrescriptionMedicationTable
+                caseId={params.CaseID}
+                initialMedications={initialMedicationsForTable}
+                availableMedications={allMedicationsFromDB}
+            />
+            {/* End Medication Table Component */}
 
-            {/* NEW: Render the Client Component for actions */}
+            {/* Action buttons (Approve/Reject) */}
             <PrescriptionActions
                 caseId={params.CaseID}
                 patientName={caseData.patientName}

@@ -1,4 +1,4 @@
-// app/actions.ts
+// app/actions.ts (add to existing file, or create if it doesn't exist)
 'use server'; // This directive marks the file as a Server Action module
 
 import { MongoClient } from 'mongodb';
@@ -6,10 +6,8 @@ import { revalidatePath } from 'next/cache'; // Import for Next.js caching reval
 
 const uri = process.env.MONGODB_URI;
 
-/**
- * Connects to the MongoDB database.
- * @returns An object containing the connected MongoClient and the database instance.
- */
+// Ensure this connectToDatabase function is consistently defined/imported in all server contexts.
+// Duplicated here for direct compilation, but ideally shared via a lib/db.ts
 async function connectToDatabase() {
     try {
         if (!uri) {
@@ -40,7 +38,6 @@ export async function updateApprovalStatus(caseId: string, status: "Approved" | 
         const { client: connectedClient, db } = await connectToDatabase();
         client = connectedClient;
 
-        // Update the 'ApprovalStatus' field in the 'cases' collection
         const result = await db.collection('cases').updateOne(
             { CaseID: caseId },
             { $set: { ApprovalStatus: status } }
@@ -50,8 +47,6 @@ export async function updateApprovalStatus(caseId: string, status: "Approved" | 
             return { success: false, message: `Case with CaseID ${caseId} not found.` };
         }
         
-        // Revalidate the current page to reflect the updated data immediately.
-        // Adjust the path to match your page's route. E.g., '/prescription/[CaseID]'
         revalidatePath(`/prescription/${caseId}`);
 
         return { success: true, message: `ApprovalStatus updated to ${status}.`, modifiedCount: result.modifiedCount };
@@ -59,6 +54,72 @@ export async function updateApprovalStatus(caseId: string, status: "Approved" | 
     } catch (error) {
         console.error(`Error updating approval status to ${status} for CaseID ${caseId}:`, error);
         return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    } finally {
+        if (client) {
+            await client.close();
+        }
+    }
+}
+
+// --- NEW SERVER ACTION: To add medication item to prescriptions collection ---
+type NewMedicationItemToSave = {
+  MedicationPlan: {
+    Main: string; // This will be MedicationID
+  };
+  Dosage: { M: boolean; A: boolean; E: boolean; N: boolean; };
+  Timing: { DailyTimes: string; Duration: string; FoodRelation: string; };
+  AdditionalNotes: string; // Optional: can be empty initially
+};
+
+export async function addMedicationItemToPrescription(caseId: string, medicationItem: NewMedicationItemToSave) {
+    let client: MongoClient | null = null;
+    try {
+        const { client: connectedClient, db } = await connectToDatabase();
+        client = connectedClient;
+
+        // Use $push to add a new item to the MedicationItems array
+        const result = await db.collection('prescriptions').updateOne(
+            { CaseID: caseId },
+            { $push: { MedicationItems: medicationItem } }
+        );
+
+        if (result.matchedCount === 0) {
+            return { success: false, message: `Prescription for CaseID ${caseId} not found.` };
+        }
+        
+        // Revalidate the prescription page to show the newly added medication
+        revalidatePath(`/prescription/${caseId}`); 
+
+        return { success: true, message: `Medication item added successfully to CaseID ${caseId}.` };
+
+    } catch (error) {
+        console.error(`Error adding medication item for CaseID ${caseId}:`, error);
+        return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    } finally {
+        if (client) {
+            await client.close();
+        }
+    }
+}
+
+// --- NEW SERVER ACTION: To fetch all available medications for dropdowns ---
+export async function getAllMedicationsForDropdown(): Promise<{ MedicationID: string; MedicationName: string; }[]> {
+    let client: MongoClient | null = null;
+    try {
+        const { client: connectedClient, db } = await connectToDatabase();
+        client = connectedClient;
+
+        // Project only necessary fields (MedicationID and MedicationName) and exclude _id
+        const medications = await db.collection('medications').find({}, {
+            projection: { MedicationID: 1, MedicationName: 1, _id: 0 } 
+        }).toArray() as { MedicationID: string; MedicationName: string; }[];
+
+        // Return parsed JSON to ensure it's serializable across the network boundary
+        return JSON.parse(JSON.stringify(medications));
+
+    } catch (error) {
+        console.error("Error fetching all medications:", error);
+        throw new Error("Failed to fetch medication list.");
     } finally {
         if (client) {
             await client.close();
